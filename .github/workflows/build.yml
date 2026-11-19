@@ -32,6 +32,61 @@ jobs:
 
         
       - name: Align Java and Kotlin versions
+
+      
+      - name: Fix projects dialog
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("PlanMarker/app/src/main/java/com/example/planmarker/MainActivity.kt")
+          lines = p.read_text().splitlines()
+
+          replacement = [
+              '    if (showProjects) {',
+              '        AlertDialog(',
+              '            onDismissRequest = { showProjects = false },',
+              '            title = { Text("Сохранённые проекты") },',
+              '            text = {',
+              '                Column {',
+              '                    if (projects.isEmpty()) {',
+              '                        Text("Пока нет сохранённых проектов")',
+              '                    } else {',
+              '                        projects.forEach { p ->',
+              '                            TextButton(onClick = {',
+              '                                projectName = p.name',
+              '                                floorName = p.floor',
+              '                                imagePath = p.imagePath',
+              '                                bitmap = BitmapFactory.decodeFile(p.imagePath)',
+              '                                rooms.clear()',
+              '                                rooms.addAll(p.rooms)',
+              '                                showProjects = false',
+              '                            }) {',
+              '                                Text("${p.name} — ${p.floor}")',
+              '                            }',
+              '                        }',
+              '                    }',
+              '                }',
+              '            },',
+              '            confirmButton = {',
+              '                TextButton(onClick = { showProjects = false }) {',
+              '                    Text("Закрыть")',
+              '                }',
+              '            }',
+              '        )',
+              '    }'
+          ]
+
+          for i, line in enumerate(lines):
+              if line.strip().startswith("if(showProjects) AlertDialog"):
+                  lines[i:i+1] = replacement
+                  break
+          else:
+              raise SystemExit("Projects dialog line not found")
+
+          p.write_text("\n".join(lines) + "\n")
+          PY
+          
         run: |
           python3 - <<'PY'
           from pathlib import Path
