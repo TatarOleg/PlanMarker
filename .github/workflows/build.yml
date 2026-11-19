@@ -58,6 +58,122 @@ jobs:
           PY
           
 
+      - name: Repair Compose dialog scope
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('PlanMarker/app/src/main/java/com/example/planmarker/MainActivity.kt')
+          s = p.read_text()
+          start = s.find('    if (dialog) AlertDialog(')
+          end_marker = '\n}\n\nprivate var pendingRect'
+          end = s.find(end_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit('Could not locate dialog block boundaries')
+          replacement = '''    if (dialog) {
+        AlertDialog(
+            onDismissRequest = { dialog = false },
+            title = { Text(if (editingIndex < 0) "Новая комната" else "Комната ${editingIndex + 1}") },
+            text = {
+                Column {
+                    OutlinedTextField(nameInput, { nameInput = it }, label = { Text("Название") })
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(noteInput, { noteInput = it }, label = { Text("Заметка") })
+                    Spacer(Modifier.height(8.dp))
+                    Text("Цвет комнаты")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(0x332563EB, 0x3338A169, 0x33D97706, 0x33DC2626, 0x338B5CF6).forEach { colorValue ->
+                            Surface(
+                                modifier = Modifier.size(32.dp),
+                                color = Color(colorValue.toLong()),
+                                shape = RoundedCornerShape(6.dp),
+                                onClick = {
+                                    if (editingIndex >= 0 && editingIndex in rooms.indices) {
+                                        rooms[editingIndex] = rooms[editingIndex].copy(color = colorValue.toLong())
+                                    } else {
+                                        pendingRect = pendingRect?.copy(color = colorValue.toLong())
+                                    }
+                                }
+                            ) {}
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (editingIndex < 0) {
+                        val pending = pendingRect
+                        if (pending != null) rooms.add(pending.copy(name = nameInput.ifBlank { pending.name }, note = noteInput))
+                    } else if (editingIndex in rooms.indices) {
+                        rooms[editingIndex] = rooms[editingIndex].copy(name = nameInput, note = noteInput)
+                    }
+                    dialog = false
+                }) { Text("Готово") }
+            },
+            dismissButton = {
+                Row {
+                    if (editingIndex >= 0) {
+                        TextButton(onClick = {
+                            if (editingIndex in rooms.indices) rooms.removeAt(editingIndex)
+                            dialog = false
+                        }) { Text("Удалить") }
+                    }
+                    TextButton(onClick = { dialog = false }) { Text("Отмена") }
+                }
+            }
+        )
+    }
+
+    if (projectDialog) {
+        AlertDialog(
+            onDismissRequest = { projectDialog = false },
+            title = { Text("Название объекта") },
+            text = {
+                Column {
+                    OutlinedTextField(projectInput, { projectInput = it }, label = { Text("Название объекта") })
+                    OutlinedTextField(floorInput, { floorInput = it }, label = { Text("Название этажа") })
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    projectName = projectInput
+                    floorName = floorInput.ifBlank { "Этаж 1" }
+                    projectDialog = false
+                }) { Text("Сохранить") }
+            }
+        )
+    }
+
+    if (showProjects) {
+        AlertDialog(
+            onDismissRequest = { showProjects = false },
+            title = { Text("Сохранённые проекты") },
+            text = {
+                Column {
+                    if (projects.isEmpty()) {
+                        Text("Пока нет сохранённых проектов")
+                    } else {
+                        projects.forEach { project ->
+                            TextButton(onClick = {
+                                projectName = project.name
+                                floorName = project.floor
+                                imagePath = project.imagePath
+                                bitmap = BitmapFactory.decodeFile(project.imagePath)
+                                rooms.clear()
+                                rooms.addAll(project.rooms)
+                                showProjects = false
+                            }) { Text("${project.name} — ${project.floor}") }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showProjects = false }) { Text("Закрыть") } }
+        )
+    }
+'''
+          p.write_text(s[:start] + replacement + s[end:])
+          print('Rewrote all three Compose dialogs with explicit scopes')
+          PY
+
       - name: Diagnose Kotlin source
         run: |
           echo '--- MainActivity.kt lines 185-225 ---'
