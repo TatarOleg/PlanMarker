@@ -58,6 +58,15 @@ jobs:
           PY
           
 
+      - name: Diagnose Kotlin source
+        run: |
+          echo '--- MainActivity.kt lines 185-225 ---'
+          nl -ba PlanMarker/app/src/main/java/com/example/planmarker/MainActivity.kt | sed -n '185,225p'
+          echo '--- app/build.gradle.kts ---'
+          cat PlanMarker/app/build.gradle.kts
+          echo '--- project files ---'
+          find PlanMarker -maxdepth 4 -type f | sort | head -80
+
       - name: Build APK
         run: gradle -p PlanMarker --no-daemon assembleDebug
 
